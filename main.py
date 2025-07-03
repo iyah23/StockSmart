@@ -23,6 +23,9 @@ class MainApp(ctk.CTk):
         self.show_frame("StartPage")
 
     def show_frame(self, page_name):
+        # Debug print to check user info before showing the frame
+        print("user_email:", getattr(self, "user_email", None))
+        print("user_role:", getattr(self, "user_role", None))
         frame = self.frames.get(page_name)
         if page_name == "DashboardPage":
             # Destroy the old dashboard if it exists

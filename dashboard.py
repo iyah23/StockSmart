@@ -544,7 +544,7 @@ class ModernSidebar(ctk.CTkFrame):
         self.active_button = None
         self.on_nav = on_nav
         self.nav_buttons = {}  # Store buttons by name
-        self.user_role = user_role
+        self.user_role = user_role or "Employee"
         self.setup_ui()
         
     def setup_ui(self):
@@ -837,7 +837,9 @@ class DashboardPage(ctk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
         super().__init__(master, **kwargs)
         self.controller = controller
-        self.sidebar = ModernSidebar(self, on_nav=self.on_nav, user_role=getattr(controller, 'user_role', 'Employee'))
+        self.user_email = getattr(controller, "user_email", None)
+        self.user_role = getattr(controller, "user_role", "Employee") or "Employee"
+        self.sidebar = ModernSidebar(self, on_nav=self.on_nav, user_role=self.user_role)
         self.sidebar.pack(side="left", fill="y")
         self.main_frame = ctk.CTkFrame(self, fg_color=COLOR_MAIN_BG, corner_radius=0)
         self.main_frame.pack(side="left", fill="both", expand=True)
