@@ -179,9 +179,10 @@ class ModernSidebar(ctk.CTkFrame):
         print(f"{name} clicked")
 
 class ItemsPage(ctk.CTkFrame):
-    def __init__(self, master, user_id=None, **kwargs):
+    def __init__(self, master, user_id=None, controller=None, **kwargs):
         super().__init__(master, **kwargs)
         self.user_id = user_id
+        self.controller = controller
         self.search_var = ctk.StringVar()
         self.filter_var = ctk.StringVar(value="All")
         self.active_category = "All"
@@ -491,9 +492,8 @@ class ItemsPage(ctk.CTkFrame):
         self.create_table_rows()
 
     def add_item(self):
-        def on_item_added():
-            self.refresh_data()
-        AddItemWindow(self, on_success=on_item_added, user_id=self.user_id)
+        on_success = getattr(self.controller, "refresh_all_pages", None)
+        AddItemWindow(self, on_success=on_success, user_id=self.user_id)
 
 class ItemsApp(ctk.CTk):
     def __init__(self, user_id):
@@ -505,7 +505,7 @@ class ItemsApp(ctk.CTk):
         self.configure(bg=COLOR_MAIN_BG)
 
         # Main items page
-        self.items_page = ItemsPage(self, user_id=self.user_id)
+        self.items_page = ItemsPage(self, user_id=self.user_id, controller=self)
         self.items_page.pack(side="left", fill="both", expand=True)
 
 

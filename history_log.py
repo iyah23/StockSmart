@@ -158,6 +158,20 @@ class HistoryLogsFrame(ctk.CTkFrame):
         subtitle.pack(anchor="w")
         actions_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         actions_frame.pack(side="right")
+        
+        # Add Refresh button
+        refresh_btn = AnimatedButton(
+            actions_frame,
+            text="🔄 Refresh",
+            font=FONT_BUTTON,
+            fg_color=COLOR_SECONDARY,
+            hover_color=COLOR_SECONDARY_DARK,
+            corner_radius=8,
+            height=40,
+            width=120,
+            command=self.refresh_data
+        )
+        refresh_btn.pack(padx=(0, 0), pady=(15, 0))
 
     def build_content(self):
         content_container = ctk.CTkFrame(self, corner_radius=16, fg_color=COLOR_CARD_BG, border_width=1, border_color=COLOR_GRAY_200)
@@ -215,6 +229,14 @@ class HistoryLogsFrame(ctk.CTkFrame):
         desc_label.pack(anchor="w", pady=(2, 0))
         time_label = ctk.CTkLabel(content_frame, text=activity["time"], font=FONT_SMALL, text_color=COLOR_TEXT_MUTED)
         time_label.pack(side="right", anchor="ne")
+
+    def refresh_data(self):
+        self.history_data = self.generate_history_data()
+        # Clear and rebuild content
+        for widget in self.winfo_children():
+            if isinstance(widget, ctk.CTkFrame) and widget not in [self]:
+                widget.destroy()
+        self.setup_ui()
 
 # Keep the window version for standalone use
 class HistoryLogsPage(ctk.CTk):

@@ -151,6 +151,20 @@ def get_total_quantity():
         result = c.fetchone()
         return result[0] if result[0] is not None else 0
 
+def count_good_stock_items():
+    items = get_all_items()
+    count = 0
+    for item in items:
+        quantity = item[3] or 0
+        min_quantity = item[12] if len(item) > 12 else None
+        try:
+            min_quantity = float(min_quantity) if min_quantity not in (None, "") else None
+        except (TypeError, ValueError):
+            min_quantity = None
+        if quantity > 0 and (min_quantity is None or quantity > min_quantity):
+            count += 1
+    return count
+
 def count_out_of_stock_items():
     with get_connection() as conn:
         c = conn.cursor()
@@ -159,11 +173,18 @@ def count_out_of_stock_items():
         return result[0] if result else 0
 
 def count_low_stock_items():
-    with get_connection() as conn:
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM items WHERE Status = 'Low Stock'")
-        result = c.fetchone()
-        return result[0] if result else 0
+    items = get_all_items()
+    count = 0
+    for item in items:
+        quantity = item[3] or 0
+        min_quantity = item[12] if len(item) > 12 else None
+        try:
+            min_quantity = float(min_quantity) if min_quantity not in (None, "") else None
+        except (TypeError, ValueError):
+            min_quantity = None
+        if min_quantity is not None and quantity <= min_quantity and quantity > 0:
+            count += 1
+    return count
 
 def get_top_consumed_items():
     with get_connection() as conn:
@@ -333,5 +354,7 @@ def get_user_by_id(user_id):
         c = conn.cursor()
         c.execute("SELECT id, first_name, last_name, email, role FROM users WHERE id = ?", (user_id,))
         return c.fetchone()
+
+
         
 

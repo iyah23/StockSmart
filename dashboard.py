@@ -15,7 +15,7 @@ from history_log import HistoryLogsFrame
 import sys
 import subprocess
 from datetime import datetime
-from database import get_first_name, get_full_name, count_items, get_total_quantity, count_out_of_stock_items, count_low_stock_items, get_top_consumed_items, get_user_details, update_user_profile, get_all_items, get_near_expiry_items
+from database import get_first_name, get_full_name, count_items, count_good_stock_items, count_out_of_stock_items, count_low_stock_items, get_top_consumed_items, get_user_details, update_user_profile, get_all_items, get_near_expiry_items
 
 # ---------- Global Configuration ---------- #
 ctk.set_appearance_mode("Light")
@@ -72,18 +72,6 @@ COLOR_TEXT_MUTED = "#7a7a6b"
 
 # Shadow effects (simulated with frames)
 SHADOW_COLOR = "#00000010"
-
-# ---------- Profile Persistence ---------- #
-PROFILE_DATA_PATH = "user_profile.json"
-
-# ---------- Enhanced Mock Data ---------- #
-PRODUCT_DATA = [
-    {"name": "Premium Widget A", "sku": "WGT-A001", "price": "$25.99", "stock": 120, "trend": "up"},
-    {"name": "Smart Widget B", "sku": "WGT-B002", "price": "$15.49", "stock": 85, "trend": "stable"},
-    {"name": "Ultra Widget C", "sku": "WGT-C003", "price": "$12.99", "stock": 0, "trend": "down"},
-    {"name": "Pro Gadget X", "sku": "GDX-X004", "price": "$45.00", "stock": 42, "trend": "up"},
-    {"name": "Elite Gadget Y", "sku": "GDX-Y005", "price": "$38.75", "stock": 7, "trend": "down"},
-]
 
 # This class defines a button with a hover effect that changes the cursor to a hand.
 class AnimatedButton(ctk.CTkButton):
@@ -521,30 +509,26 @@ class NotificationPopup(ctk.CTkToplevel):
     def create_notification_item(self, parent, notification):
         # Notification item container
         item_frame = ctk.CTkFrame(parent, fg_color=notification["bg_color"], 
-                                corner_radius=8, border_width=1, border_color=notification["border_color"])
+                                  corner_radius=8, border_width=1, border_color=notification["border_color"])
         item_frame.pack(fill="x", pady=5)
 
         # Content frame
         content_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
         content_frame.pack(fill="x", padx=15, pady=12)
 
-        # Icon and content
+        # Icon
         icon_label = ctk.CTkLabel(content_frame, text=notification["icon"], font=("Segoe UI", 18))
-        icon_label.pack(side="left", padx=(0, 12))
+        icon_label.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="n")
 
-        # Text content
-        text_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        text_frame.pack(side="left", expand=True, fill="x")
+        # Main message (row 0)
+        title_label = ctk.CTkLabel(content_frame, text=notification["title"], 
+                                   font=FONT_BODY, text_color=COLOR_TEXT_PRIMARY, anchor="w", justify="left")
+        title_label.grid(row=0, column=1, sticky="w")
 
-        title_label = ctk.CTkLabel(text_frame, text=notification["title"], 
-                                 font=FONT_BODY, text_color=COLOR_TEXT_PRIMARY, 
-                                 anchor="w", justify="left")
-        title_label.pack(anchor="w")
-
-        # Date
+        # Date (row 1)
         date_label = ctk.CTkLabel(content_frame, text=notification["date"], 
-                                font=FONT_SMALL, text_color=COLOR_TEXT_MUTED)
-        date_label.pack(side="right")
+                                  font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, anchor="w")
+        date_label.grid(row=1, column=1, sticky="w")
 
     def on_close(self):
         """Handle window close event"""
@@ -618,6 +602,8 @@ class ModernSidebar(ctk.CTkFrame):
                                  command=logout)
         logout_btn.pack(expand=True, padx=15, pady=15)
 
+        print("ModernSidebar user_role:", self.user_role)
+
     def create_nav_button(self, parent, name, icon, is_active=False):
         fg_color = COLOR_SECONDARY_DARK if is_active else "transparent"
         text_color = COLOR_ROYAL_BLUE if is_active else COLOR_ROYAL_BLUE
@@ -643,133 +629,67 @@ class ModernSidebar(ctk.CTkFrame):
         if self.on_nav:
             self.on_nav(name)
 
-# This is the main Dashboard page that shows an overview of inventory status.
-# It includes a greeting, statistic cards, a calendar, and a top-consumed items chart.
-class DashboardPage(ctk.CTkFrame):
-    def __init__(self, master, **kwargs):
+class DashboardOverviewFrame(ctk.CTkFrame):
+    def __init__(self, master, controller, **kwargs):
         super().__init__(master, **kwargs)
-        self.configure(fg_color=COLOR_MAIN_BG, corner_radius=0)
+        self.controller = controller
+        self.configure(fg_color=COLOR_MAIN_BG)
         self.build_top_bar()
         self.build_overview_section()
         self.build_analytics_section()
 
     def build_top_bar(self):
-        top_bar = ctk.CTkFrame(self, fg_color="transparent", height=80)
+        user_email = getattr(self.controller, 'user_email', None)
+        print("DashboardOverviewFrame user_email:", user_email)
+        first_name = get_first_name(user_email) or "User"
+        full_name = get_full_name(user_email) or "User"
+        greeting = f"Good {self.get_current_greeting()}, {first_name}! 🖐"
+        sub_label = "Here's what's happening with your inventory today"
+
+        top_bar = ctk.CTkFrame(self, fg_color=COLOR_MAIN_BG)
         top_bar.pack(fill="x", padx=30, pady=(20, 0))
-        top_bar.pack_propagate(False)
-        welcome_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
-        welcome_frame.pack(side="left", expand=True, fill="both")
-        # --- Dynamic greeting logic ---
-        if len(sys.argv) > 2:
-            user_email = sys.argv[1]
-            user_role = sys.argv[2]
-        elif len(sys.argv) > 1:
-            user_email = sys.argv[1]
-            user_role = "Employee"
-        else:
-            user_email = None
-            user_role = "Employee"
-        first_name = get_first_name(user_email) if user_email else "User"
-        full_name = get_full_name(user_email) if user_email else "User"
-        now = datetime.now().time()
-        if now >= datetime.strptime("05:00", "%H:%M").time() and now < datetime.strptime("12:00", "%H:%M").time():
-            greeting = "Good Morning"
-        elif now >= datetime.strptime("12:00", "%H:%M").time() and now < datetime.strptime("18:00", "%H:%M").time():
-            greeting = "Good Afternoon"
-        else:
-            greeting = "Good Evening"
-        welcome_text = f"{greeting}, {first_name}! 👋"
-        self.welcome_label = ctk.CTkLabel(welcome_frame, text=welcome_text, font=FONT_H1, text_color=COLOR_TEXT_PRIMARY)
-        self.welcome_label.pack(anchor="w", pady=(10, 0))
-        subtitle = ctk.CTkLabel(welcome_frame, text="Here's what's happening with your inventory today", font=FONT_BODY, text_color=COLOR_TEXT_MUTED)
-        subtitle.pack(anchor="w")
-        actions_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
-        actions_frame.pack(side="right")
+        top_bar.grid_columnconfigure(0, weight=1)
+        top_bar.grid_columnconfigure(1, weight=0)
+        left_frame = ctk.CTkFrame(top_bar, fg_color=COLOR_MAIN_BG)
+        left_frame.grid(row=0, column=0, sticky="w")
+        greeting_label = ctk.CTkLabel(left_frame, text=greeting, font=FONT_H1, text_color=COLOR_TEXT_PRIMARY)
+        greeting_label.pack(anchor="w")
+        sub_label_widget = ctk.CTkLabel(left_frame, text=sub_label, font=FONT_BODY, text_color=COLOR_TEXT_MUTED)
+        sub_label_widget.pack(anchor="w")
+        right_frame = ctk.CTkFrame(top_bar, fg_color=COLOR_MAIN_BG)
+        right_frame.grid(row=0, column=1, sticky="e", padx=(0, 10))
 
-        def show_notifications():
-            notifications = []
-            today = datetime.now().strftime('%b %d, %Y')
-            # Out of stock
-            for item in get_all_items():
-                name = item[1]
-                qty = item[3]
-                exp = item[7] if len(item) > 7 else None
-                if qty == 0:
-                    notifications.append({
-                        "type": "error",
-                        "icon": "⚠️",
-                        "title": f"{name} is currently out of stock.",
-                        "date": today,
-                        "bg_color": "#fff5f5",
-                        "border_color": "#fed7d7"
-                    })
-                elif qty < (item[12] if len(item) > 12 and item[12] is not None else 6):
-                    notifications.append({
-                        "type": "warning",
-                        "icon": "⚠️",
-                        "title": f"{name} is running low on stocks. Only {qty} remaining.",
-                        "date": today,
-                        "bg_color": "#fffbeb",
-                        "border_color": "#fed7aa"
-                    })
-            # Near expiry
-            for name, exp_date, qty in get_near_expiry_items():
-                notifications.append({
-                    "type": "info",
-                    "icon": "🕐",
-                    "title": f"{name} is nearing its expiry date. Expiry: {exp_date}.",
-                    "date": today,
-                    "bg_color": "#fef2f2",
-                    "border_color": "#fecaca"
-                })
-            # Show popup
-            class RealNotificationPopup(NotificationPopup):
-                def setup_ui(self):
-                    main_container = ctk.CTkFrame(self, fg_color=COLOR_WHITE, corner_radius=20, border_width=2, border_color=COLOR_GRAY_200)
-                    main_container.pack(fill="both", expand=True, padx=20, pady=20)
-                    header_frame = ctk.CTkFrame(main_container, fg_color="transparent", height=60)
-                    header_frame.pack(fill="x", padx=25, pady=(20, 0))
-                    header_frame.pack_propagate(False)
-                    title_label = ctk.CTkLabel(header_frame, text="Notifications", font=FONT_H2, text_color=COLOR_TEXT_PRIMARY)
-                    title_label.pack(side="left", pady=15)
-                    close_btn = AnimatedButton(header_frame, text="✕", font=("Segoe UI", 16, "bold"), fg_color="transparent", hover_color=COLOR_GRAY_100, text_color=COLOR_GRAY_600, corner_radius=15, width=30, height=30, command=self.on_close)
-                    close_btn.pack(side="right", pady=15)
-                    notifications_frame = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
-                    notifications_frame.pack(fill="both", expand=True, padx=25, pady=(0, 20))
-                    if notifications:
-                        for notification in notifications:
-                            self.create_notification_item(notifications_frame, notification)
-                    else:
-                        empty_label = ctk.CTkLabel(notifications_frame, text="No notifications.", font=FONT_BODY, text_color=COLOR_TEXT_MUTED)
-                        empty_label.pack(pady=20)
-            popup = RealNotificationPopup(self.master)
-            popup.center_on_parent()
-            popup.grab_set()
-
-        notif_btn = AnimatedButton(
-            actions_frame,
+        notif_btn = ctk.CTkButton(
+            right_frame,
             text="🔔",
-            font=("Segoe UI", 18),
-            fg_color=COLOR_CARD_BG,
-            hover_color=COLOR_SIDEBAR_ACTIVE,
-            text_color=COLOR_TEXT_SECONDARY,
-            corner_radius=8,
-            width=50,
-            height=50,
-            command=show_notifications  
+            width=48,
+            height=40,
+            font=("Segoe UI", 20),
+            fg_color="#f6f7fa",
+            text_color="#8094c2",
+            hover_color="#e9ecf3",
+            corner_radius=12,
+            border_width=0,
+            command=self.show_notifications
         )
-        notif_btn.pack(side="left", padx=10)
-        
-        # --- Profile button with full name ---
-        profile_btn_label = full_name if full_name else "User"
-        def open_profile_popup():
-            # Get the main app window (parent of the main_frame)
-            app_window = self.master.master
-            popup = UserProfilePopup(app_window, user_email)
-            popup.center_on_parent()
-            popup.grab_set()
-        self.profile_btn = AnimatedButton(actions_frame, text=profile_btn_label, font=FONT_BODY, text_color=COLOR_TEXT_SECONDARY, fg_color=COLOR_CARD_BG, hover_color=COLOR_SIDEBAR_ACTIVE, corner_radius=8, height=50, command=open_profile_popup)
-        self.profile_btn.pack(side="left", padx=10)
+        notif_btn.pack(side="left", padx=(0, 12))
+
+        user_btn = ctk.CTkButton(
+            right_frame,
+            text=full_name,
+            width=160,
+            height=40,
+            font=("Segoe UI", 16, "bold"),
+            fg_color="#f6f7fa",
+            text_color="#8094c2",
+            hover_color="#e9ecf3",
+            corner_radius=12,
+            border_width=0,
+            command=self.show_user_profile
+        )
+        user_btn.pack(side="left")
+        self.greeting_label = greeting_label
+        self.user_btn = user_btn
 
     def build_overview_section(self):
         overview_frame = ctk.CTkFrame(self, corner_radius=16, fg_color=COLOR_CARD_BG, border_width=1, border_color=COLOR_GRAY_200)
@@ -782,30 +702,25 @@ class DashboardPage(ctk.CTkFrame):
         refresh_btn.pack(side="right")
         cards_frame = ctk.CTkFrame(overview_frame, fg_color="transparent")
         cards_frame.pack(fill="x", padx=30, pady=(0, 25))
-        # Get real-time item count, total quantity, out-of-stock count, and low stock count from database
         item_count = count_items()
         formatted_count = f"{item_count:,}"
-        total_quantity = get_total_quantity()
+        total_quantity = count_good_stock_items()
         formatted_quantity = f"{total_quantity:,}"
         out_of_stock = count_out_of_stock_items()
         formatted_out = f"{out_of_stock:,}"
         low_stock = count_low_stock_items()
         formatted_low = f"{low_stock:,}"
-        
         cards_data = [
             (COLOR_PRIMARY, "📦", formatted_count, "Total Products"),
             (COLOR_ACCENT_SUCCESS, "✅", formatted_quantity, "Items in Stock"),
             (COLOR_ACCENT_ERROR, "⚠️", formatted_out, "Out of Stock"),
             (COLOR_ACCENT_WARNING, "🔔", formatted_low, "Low Stock Alerts")
         ]
-        
-        # Store cards for refresh functionality
         self.cards = []
-        
         for bg_color, icon, value, label in cards_data:
             card = EnhancedCard(cards_frame, bg_color, icon, value, label)
             card.pack(side="left", expand=True, fill="both", padx=8)
-            self.cards.append(card)  # Track for refresh later
+            self.cards.append(card)
 
     def build_analytics_section(self):
         analytics_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -844,11 +759,7 @@ class DashboardPage(ctk.CTkFrame):
         period_label.pack(side="right")
         chart_content = ctk.CTkScrollableFrame(chart_frame, fg_color="transparent")
         chart_content.pack(fill="both", expand=True, padx=25, pady=(0, 20))
-        
-        # Get dynamic top consumed items from database
         top_items = get_top_consumed_items()
-        
-        # Color palette for the bars
         color_palette = [
             COLOR_PRIMARY,
             COLOR_ACCENT_SUCCESS,
@@ -860,7 +771,6 @@ class DashboardPage(ctk.CTkFrame):
             COLOR_GRAY_700,
             COLOR_GRAY_800
         ]
-        
         for i, (item_name, percentage) in enumerate(top_items):
             color = color_palette[i % len(color_palette)]
             self.create_consumption_bar(chart_content, item_name, percentage, color, i)
@@ -891,7 +801,7 @@ class DashboardPage(ctk.CTkFrame):
                 bar.place(x=0, y=0, relwidth=current_width, relheight=1)
                 time.sleep(0.02)
         threading.Thread(target=animate, daemon=True).start()
-    
+
     def get_current_greeting(self):
         now = datetime.now().time()
         if now >= datetime.strptime("05:00", "%H:%M").time() and now < datetime.strptime("12:00", "%H:%M").time():
@@ -900,87 +810,124 @@ class DashboardPage(ctk.CTkFrame):
             return "Afternoon"
         else:
             return "Evening"
-    
+
     def refresh_overview_cards(self):
-        """Refresh all overview cards with latest data from database"""
         item_count = count_items()
         formatted_count = f"{item_count:,}"
-
-        total_quantity = get_total_quantity()
+        total_quantity = count_good_stock_items()
         formatted_quantity = f"{total_quantity:,}"
-
         out_of_stock = count_out_of_stock_items()
         formatted_out = f"{out_of_stock:,}"
-
         low_stock = count_low_stock_items()
         formatted_low = f"{low_stock:,}"
-
-        # Animate the value updates
         if hasattr(self, 'cards') and len(self.cards) >= 4:
             self.cards[0].animate_value(formatted_count)
             self.cards[1].animate_value(formatted_quantity)
             self.cards[2].animate_value(formatted_out)
             self.cards[3].animate_value(formatted_low)
 
-# This is the main application class that initializes the sidebar and loads pages like the dashboard.
-# It also centers the window on the screen and handles page switching.
-class App(ctk.CTk):
-    def __init__(self, user_role, user_id):
-        super().__init__()
-        self.title("StockSmart Dashboard - Enhanced")
-        self.geometry("1200x800")
-        self.minsize(1000, 700)
-        self.configure(bg=COLOR_MAIN_BG)
-        self.profile_popup = None
-        self.notification_popup = None
-        self.current_page = None
-        self.user_role = user_role
-        self.user_id = user_id
+    def show_notifications(self):
+        self.controller.show_notifications()
 
-        self.setup_ui()
-        self.center_window(1200, 800)
+    def show_user_profile(self):
+        self.controller.show_user_profile()
 
-    def setup_ui(self):
-        self.sidebar = ModernSidebar(self, on_nav=self.show_page, user_role=self.user_role)
+# --- Refactored DashboardPage ---
+class DashboardPage(ctk.CTkFrame):
+    def __init__(self, master, controller, **kwargs):
+        super().__init__(master, **kwargs)
+        self.controller = controller
+        self.sidebar = ModernSidebar(self, on_nav=self.on_nav, user_role=getattr(controller, 'user_role', 'Employee'))
         self.sidebar.pack(side="left", fill="y")
         self.main_frame = ctk.CTkFrame(self, fg_color=COLOR_MAIN_BG, corner_radius=0)
         self.main_frame.pack(side="left", fill="both", expand=True)
-        self.show_page("Dashboard")
+        # --- New: content_container for swapping frames ---
+        self.content_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.content_container.pack(fill="both", expand=True)
+        # --- Instantiate all sub-frames ---
+        self.dashboard_overview = DashboardOverviewFrame(self.content_container, self)
+        from inventoryy import InventoryPage
+        from items import ItemsPage
+        from history_log import HistoryLogsFrame
+        self.inventory_page = InventoryPage(self.content_container, user_id=getattr(controller, 'user_id', None))
+        self.items_page = ItemsPage(self.content_container, user_id=getattr(controller, 'user_id', None))
+        self.history_logs = HistoryLogsFrame(self.content_container)
+        # Show dashboard overview by default
+        self.show_content("Dashboard")
 
-    # This function switches the main page content depending on which tab (Dashboard, Inventory, etc.) was clicked.
-    def show_page(self, page_name):
-        if self.current_page:
-            self.current_page.destroy()
-        if page_name == "Dashboard":
-            self.current_page = DashboardPage(self.main_frame)
-        elif page_name == "Inventory":
-            self.current_page = InventoryPage(self.main_frame, user_id=self.user_id)
-        elif page_name == "Items":
-            self.current_page = ItemsPage(self.main_frame)
-        elif page_name == "History Logs":
-            self.current_page = HistoryLogsFrame(self.main_frame)
-        if self.current_page:
-            self.current_page.pack(fill="both", expand=True)
+    def show_content(self, name):
+        for frame in [self.dashboard_overview, self.inventory_page, self.items_page, self.history_logs]:
+            frame.pack_forget()
+        if name == "Dashboard":
+            self.dashboard_overview.pack(fill="both", expand=True)
+        elif name == "Inventory":
+            self.inventory_page.pack(fill="both", expand=True)
+        elif name == "Items":
+            self.items_page.pack(fill="both", expand=True)
+        elif name == "History Logs":
+            self.history_logs.pack(fill="both", expand=True)
 
-    # This function centers the application window on the user's screen.
-    def center_window(self, width=1200, height=800):
-        self.update_idletasks()
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        x = (screen_width // 2) - (width // 2)
-        y = (screen_height // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+    def on_nav(self, name):
+        self.show_content(name)
 
-# This is the entry point of the program.
-# It runs the app with the default role (Employee) unless another role is passed as an argument.
-if __name__ == "__main__":
-    if len(sys.argv) > 3:
-        user_email = sys.argv[1]
-        user_role = sys.argv[2]
-        user_id = int(sys.argv[3])
-    else:
-        user_email = None
-        user_role = "Employee"
-        user_id = 1  # or None, or a default/test user
-    app = App(user_role, user_id)
-    app.mainloop()
+    def show_notifications(self):
+        notifications = []
+        today = datetime.now().strftime('%b %d, %Y')
+        for item in get_all_items():
+            name = item[1]
+            qty = item[3]
+            exp = item[7] if len(item) > 7 else None
+            if qty == 0:
+                notifications.append({
+                    "type": "error",
+                    "icon": "⚠️",
+                    "title": f"{name} is currently out of stock.",
+                    "date": today,
+                    "bg_color": "#fff5f5",
+                    "border_color": "#fed7d7"
+                })
+            elif qty < (item[12] if len(item) > 12 and item[12] is not None else 6):
+                notifications.append({
+                    "type": "warning",
+                    "icon": "⚠️",
+                    "title": f"{name} is running low on stocks. Only {qty} remaining.",
+                    "date": today,
+                    "bg_color": "#fffbeb",
+                    "border_color": "#fed7aa"
+                })
+        for name, exp_date, qty in get_near_expiry_items():
+            notifications.append({
+                "type": "info",
+                "icon": "🕐",
+                "title": f"{name} is nearing its expiry date. Expiry: {exp_date}.",
+                "date": today,
+                "bg_color": "#fef2f2",
+                "border_color": "#fecaca"
+            })
+        class RealNotificationPopup(NotificationPopup):
+            def setup_ui(self):
+                main_container = ctk.CTkFrame(self, fg_color=COLOR_WHITE, corner_radius=20, border_width=2, border_color=COLOR_GRAY_200)
+                main_container.pack(fill="both", expand=True, padx=20, pady=20)
+                header_frame = ctk.CTkFrame(main_container, fg_color="transparent", height=60)
+                header_frame.pack(fill="x", padx=25, pady=(20, 0))
+                header_frame.pack_propagate(False)
+                title_label = ctk.CTkLabel(header_frame, text="Notifications", font=FONT_H2, text_color=COLOR_TEXT_PRIMARY)
+                title_label.pack(side="left", pady=15)
+                close_btn = AnimatedButton(header_frame, text="✕", font=("Segoe UI", 16, "bold"), fg_color="transparent", hover_color=COLOR_GRAY_100, text_color=COLOR_GRAY_600, corner_radius=15, width=30, height=30, command=self.on_close)
+                close_btn.pack(side="right", pady=15)
+                notifications_frame = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
+                notifications_frame.pack(fill="both", expand=True, padx=25, pady=(0, 20))
+                if notifications:
+                    for notification in notifications:
+                        self.create_notification_item(notifications_frame, notification)
+                else:
+                    empty_label = ctk.CTkLabel(notifications_frame, text="No notifications.", font=FONT_BODY, text_color=COLOR_TEXT_MUTED)
+                    empty_label.pack(pady=20)
+        popup = RealNotificationPopup(self)
+        popup.center_on_parent()
+        popup.grab_set()
+
+    def show_user_profile(self):
+        user_email = getattr(self.controller, 'user_email', None)
+        UserProfilePopup(self, user_email)
+

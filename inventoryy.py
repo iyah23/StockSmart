@@ -154,6 +154,11 @@ class InventoryPage(ctk.CTkFrame):
         for item in items_data:
             # item: (ItemID, ItemName, Type, Quantity, Unit, StorageLocation, Brand, ExpirationDate, DateAdded, SupplierID, SupplierName, ContactPerson, ContactNumber, Email, MinimumQuantity)
             min_quantity = item[12] if len(item) > 12 else None
+            if min_quantity is not None and min_quantity != "":
+                try:
+                    min_quantity = float(min_quantity)
+                except (TypeError, ValueError):
+                    min_quantity = None
             formatted_item = {
                 "item_no": f"{item[0]:04d}",
                 "item_name": item[1] or "N/A",
@@ -162,6 +167,7 @@ class InventoryPage(ctk.CTkFrame):
                 "last_updated": (item[8][:10] if item[8] else "N/A"),
                 # Compute status dynamically using min_quantity
                 "status": self.compute_status(item[3] or 0, min_quantity),
+                "min_quantity": min_quantity,
                 # Add other fields if needed
             }
             formatted_items.append(formatted_item)
@@ -170,7 +176,7 @@ class InventoryPage(ctk.CTkFrame):
     def compute_status(self, quantity, min_quantity=None):
         if quantity == 0:
             return "Out of Stock"
-        elif min_quantity is not None and min_quantity != "" and quantity <= min_quantity:
+        if min_quantity is not None and quantity <= min_quantity:
             return "Low Stock"
         else:
             return "Good"
@@ -207,22 +213,37 @@ class InventoryPage(ctk.CTkFrame):
         self.create_inventory_table(content_container)
 
     def build_header(self):
-        """Build the header section with title"""
+        """Build the header section with title and a Refresh button (styled like ItemsPage)"""
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(0, 0))
         header_frame.pack_propagate(False)
         header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_columnconfigure(1, weight=0)
 
         # Title section
         title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         title_frame.grid(row=0, column=0, sticky="ew")
         title_frame.grid_columnconfigure(0, weight=1)
         
-        title_label = ctk.CTkLabel(title_frame, text=" Inventory", font=FONT_H1, text_color=COLOR_TEXT_PRIMARY)
+        title_label = ctk.CTkLabel(title_frame, text="Inventory", font=FONT_H1, text_color=COLOR_TEXT_PRIMARY)
         title_label.grid(row=0, column=0, sticky="w", pady=(5, 0))
         
         subtitle = ctk.CTkLabel(title_frame, text="Manage your inventory items and stock levels", font=FONT_BODY, text_color=COLOR_TEXT_MUTED)
-        subtitle.grid(row=1, column=0, sticky="w",  pady=(5, 0))
+        subtitle.grid(row=1, column=0, sticky="w")
+
+        # Refresh button (styled like ItemsPage)
+        refresh_btn = AnimatedButton(
+            header_frame,
+            text="🔄 Refresh",
+            font=FONT_BUTTON,
+            fg_color=COLOR_SECONDARY,
+            hover_color=COLOR_SECONDARY_DARK,
+            corner_radius=8,
+            height=40,
+            width=120,
+            command=self.refresh_data
+        )
+        refresh_btn.grid(row=0, column=1, rowspan=2, sticky="e", padx=(10, 0))
 
     def create_search_filter_bar(self, parent):
         """Create search and filter controls"""
@@ -441,8 +462,9 @@ class InventoryPage(ctk.CTkFrame):
         filter_status = self.filter_var.get()
         self.filtered_data = []
         for item in self.get_items_from_database():
-            # Compute status dynamically
-            status = self.compute_status(item["quantity"])
+            # Always recompute status for filtering
+            min_quantity = item.get("min_quantity", None)
+            status = self.compute_status(item["quantity"], min_quantity)
             if filter_status != "All" and status != filter_status:
                 continue
             if search_term and search_term not in item["item_name"].lower():
