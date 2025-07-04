@@ -210,7 +210,8 @@ class SignUpPage(ctk.CTkFrame):
             return
         # Add more password validation as needed
         # Add user to database
-        result = add_user(first_name, last_name, email, password, self.selected_role)
+        role = getattr(self.controller, 'selected_role', 'Employee')
+        result = add_user(first_name, last_name, email, password, role)
         if result == "exists":
             self.show_error("User already exists!")
             return
@@ -219,7 +220,7 @@ class SignUpPage(ctk.CTkFrame):
             return
         # Set user info on the controller BEFORE navigating
         self.controller.user_email = email
-        self.controller.user_role = self.selected_role
+        self.controller.user_role = role
         # If you have a user_id, set it as well
         self.controller.show_frame("DashboardPage")
         

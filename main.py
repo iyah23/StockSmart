@@ -3,6 +3,9 @@ from StartPage import StartPage
 from LoginPage import LoginPage
 from SignUpPage import SignUpPage
 from dashboard import DashboardPage
+from database import initialize_database
+
+initialize_database()
 
 class MainApp(ctk.CTk):
     def __init__(self):

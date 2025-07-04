@@ -228,7 +228,7 @@ def add_supplier(supplier_name, contact_person, contact_number, email):
                 VALUES (?, ?, ?, ?)
             ''', (supplier_name, contact_person, contact_number, email))
             conn.commit()
-            return c.lastrowid  # Return the SupplierID
+            return c.lastrowid  
     except sqlite3.IntegrityError:
         return None
 
@@ -251,7 +251,7 @@ def add_item(item_name, item_type, quantity, unit, storage_location, brand, expi
         c.execute('''
             INSERT INTO items 
             (ItemName, Type, Quantity, Unit, StorageLocation, Brand, ExpirationDate, DateAdded, SupplierID, Status, LastUpdated, MinimumQuantity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, 'Good', date('now'), ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, date('now'), ?)
         ''', (item_name, item_type, quantity, unit, storage_location, brand, expiry_date, supplier_id, min_quantity))
         conn.commit()
         return c.lastrowid
@@ -354,7 +354,11 @@ def get_user_by_id(user_id):
         c = conn.cursor()
         c.execute("SELECT id, first_name, last_name, email, role FROM users WHERE id = ?", (user_id,))
         return c.fetchone()
-
-
+    
+def initialize_database():
+    create_user_table()
+    create_supplier_table()
+    create_items_table()
+    create_histroy_table()
         
 
