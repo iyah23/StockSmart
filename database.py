@@ -28,7 +28,7 @@ def create_items_table():
                 ItemID INTEGER PRIMARY KEY AUTOINCREMENT,
                 ItemName TEXT NOT NULL,
                 Type TEXT NOT NULL,
-                Quantity REAL NOT NULL,
+                Quantity INTEGER NOT NULL,
                 Unit TEXT NOT NULL,
                 StorageLocation TEXT NOT NULL,
                 Brand TEXT,
@@ -158,7 +158,7 @@ def count_good_stock_items():
         quantity = item[3] or 0
         min_quantity = item[12] if len(item) > 12 else None
         try:
-            min_quantity = float(min_quantity) if min_quantity not in (None, "") else None
+            min_quantity = int(min_quantity) if min_quantity not in (None, "") else None
         except (TypeError, ValueError):
             min_quantity = None
         if quantity > 0 and (min_quantity is None or quantity > min_quantity):
@@ -179,7 +179,7 @@ def count_low_stock_items():
         quantity = item[3] or 0
         min_quantity = item[12] if len(item) > 12 else None
         try:
-            min_quantity = float(min_quantity) if min_quantity not in (None, "") else None
+            min_quantity = int(min_quantity) if min_quantity not in (None, "") else None
         except (TypeError, ValueError):
             min_quantity = None
         if min_quantity is not None and quantity <= min_quantity and quantity > 0:
@@ -193,9 +193,10 @@ def get_top_consumed_items():
             SELECT i.ItemName, COUNT(*) as frequency
             FROM history h
             JOIN items i ON h.ItemID = i.ItemID
-            WHERE h.Action = 'Deducted Stock'
+            WHERE h.Action LIKE '%Deduct%' OR h.Action LIKE '%deduct%'
             GROUP BY h.ItemID
             ORDER BY frequency DESC
+            LIMIT 10
         """)
         rows = c.fetchall()
         total = sum(freq for _, freq in rows)
@@ -251,7 +252,7 @@ def add_item(item_name, item_type, quantity, unit, storage_location, brand, expi
         c.execute('''
             INSERT INTO items 
             (ItemName, Type, Quantity, Unit, StorageLocation, Brand, ExpirationDate, DateAdded, SupplierID, Status, LastUpdated, MinimumQuantity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, date('now'), ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, 'Good', date('now'), ?)
         ''', (item_name, item_type, quantity, unit, storage_location, brand, expiry_date, supplier_id, min_quantity))
         conn.commit()
         return c.lastrowid
@@ -300,6 +301,20 @@ def get_item_by_id(item_id):
 def log_history(item_id, user_id, action, details=None):
     """Log an action to the History table."""
     create_histroy_table()
+    
+    if user_id is None:
+        print(f"Warning: user_id is None for action '{action}'. Using fallback user.")
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT id FROM users ORDER BY id LIMIT 1")
+            fallback_user = c.fetchone()
+            if fallback_user:
+                user_id = fallback_user[0]
+                print(f"Using fallback user_id: {user_id}")
+            else:
+                print("Error: No users found in database!")
+                return
+    
     with get_connection() as conn:
         c = conn.cursor()
         from datetime import datetime
@@ -360,5 +375,3 @@ def initialize_database():
     create_supplier_table()
     create_items_table()
     create_histroy_table()
-        
-

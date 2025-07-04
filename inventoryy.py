@@ -156,7 +156,7 @@ class InventoryPage(ctk.CTkFrame):
             min_quantity = item[12] if len(item) > 12 else None
             if min_quantity is not None and min_quantity != "":
                 try:
-                    min_quantity = float(min_quantity)
+                    min_quantity = int(min_quantity)
                 except (TypeError, ValueError):
                     min_quantity = None
             formatted_item = {

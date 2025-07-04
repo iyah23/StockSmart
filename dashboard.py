@@ -129,18 +129,21 @@ class EnhancedCard(ctk.CTkFrame):
         
     def animate_value(self, target_value):
         """Animate the counter from 0 to target value"""
-        def animate():
-            current = 0
-            target = int(target_value.replace(',', ''))
-            step = max(1, target // 30)  # 30 frames for smooth animation
-            
-            while current < target:
+        current = 0
+        target = int(target_value.replace(',', ''))
+        step = max(1, target // 30)  # 30 frames for smooth animation
+        
+        def update_label():
+            nonlocal current
+            if current < target:
                 current = min(current + step, target)
                 formatted_value = f"{current:,}" if current >= 1000 else str(current)
                 self.value_label.configure(text=formatted_value)
-                time.sleep(0.03)
+                if current < target:
+                    self.after(30, update_label)  # Schedule next update in 30ms
         
-        threading.Thread(target=animate, daemon=True).start()
+        # Start the animation
+        self.after(0, update_label)
         
     def on_enter(self, event):
         self.configure(border_width=2, border_color=COLOR_PRIMARY)
@@ -602,8 +605,6 @@ class ModernSidebar(ctk.CTkFrame):
                                  command=logout)
         logout_btn.pack(expand=True, padx=15, pady=15)
 
-        print("ModernSidebar user_role:", self.user_role)
-
     def create_nav_button(self, parent, name, icon, is_active=False):
         fg_color = COLOR_SECONDARY_DARK if is_active else "transparent"
         text_color = COLOR_ROYAL_BLUE if is_active else COLOR_ROYAL_BLUE
@@ -640,7 +641,6 @@ class DashboardOverviewFrame(ctk.CTkFrame):
 
     def build_top_bar(self):
         user_email = getattr(self.controller, 'user_email', None)
-        print("DashboardOverviewFrame user_email:", user_email)
         first_name = get_first_name(user_email) or "User"
         full_name = get_full_name(user_email) or "User"
         greeting = f"Good {self.get_current_greeting()}, {first_name}! 🖐"
@@ -792,21 +792,27 @@ class DashboardOverviewFrame(ctk.CTkFrame):
         self.animate_progress_bar(progress_bar, value)
 
     def animate_progress_bar(self, bar, target_width):
-        def animate():
-            current_width = 0
-            target = target_width / 100
-            step = target / 30
-            while current_width < target:
+        current_width = 0
+        target = target_width / 100
+        step = target / 30
+        
+        def update_bar():
+            nonlocal current_width
+            if current_width < target:
                 current_width = min(current_width + step, target)
                 bar.place(x=0, y=0, relwidth=current_width, relheight=1)
-                time.sleep(0.02)
-        threading.Thread(target=animate, daemon=True).start()
+                if current_width < target:
+                    self.after(20, update_bar)  # Schedule next update in 20ms
+        
+        # Start the animation
+        self.after(0, update_bar)
 
     def get_current_greeting(self):
-        now = datetime.now().time()
-        if now >= datetime.strptime("05:00", "%H:%M").time() and now < datetime.strptime("12:00", "%H:%M").time():
+        now = datetime.now()
+        hour = now.hour
+        if 5 <= hour < 12:
             return "Morning"
-        elif now >= datetime.strptime("12:00", "%H:%M").time() and now < datetime.strptime("18:00", "%H:%M").time():
+        elif 12 <= hour < 18:
             return "Afternoon"
         else:
             return "Evening"

@@ -182,7 +182,7 @@ class AddItemWindow(ctk.CTkToplevel):
 
     def pick_date(self):
         self.grab_release()
-        top = tk.Toplevel(self)  # Use standard Tkinter Toplevel
+        top = tk.Toplevel(self)  
         top.title("Select Expiry Date")
         cal = Calendar(top, selectmode='day', date_pattern='mm/dd/yy', font=("Arial", 16),
                        background='white', foreground='black')
@@ -222,9 +222,9 @@ class AddItemWindow(ctk.CTkToplevel):
             messagebox.showerror("Validation Error", "Quantity is required!", parent=self)
             return
         try:
-            float(quantity)
+            int(quantity)
         except ValueError:
-            messagebox.showerror("Validation Error", "Quantity must be a valid number!", parent=self)
+            messagebox.showerror("Validation Error", "Quantity must be a valid whole number!", parent=self)
             return
         if not unit:
             messagebox.showerror("Validation Error", "Unit is required!", parent=self)
@@ -259,13 +259,13 @@ class AddItemWindow(ctk.CTkToplevel):
             item_id = add_item(
                 item_name=item_name,
                 item_type=item_type,
-                quantity=float(quantity),
+                quantity=int(quantity),
                 unit=unit,
                 storage_location=storage,
                 brand=brand if brand else None,
                 expiry_date=expiry if expiry else None,
                 supplier_id=supplier_id,
-                min_quantity=min_quantity if min_quantity else None
+                min_quantity=int(min_quantity) if min_quantity else None
             )
             if item_id:
                 messagebox.showinfo("Success", f"Item '{item_name}' has been added successfully!", parent=self)

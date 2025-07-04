@@ -173,6 +173,26 @@ class EditItemWindow(ctk.CTkToplevel):
             "email": self.email_entry.get(),
         }
 
+        # Validate and convert quantities to integers
+        try:
+            if new["quantity"]:
+                new["quantity"] = int(new["quantity"])
+            else:
+                messagebox.showerror("Validation Error", "Quantity is required!", parent=self)
+                return
+        except ValueError:
+            messagebox.showerror("Validation Error", "Quantity must be a valid whole number!", parent=self)
+            return
+
+        try:
+            if new["min_quantity"]:
+                new["min_quantity"] = int(new["min_quantity"])
+            else:
+                new["min_quantity"] = None
+        except ValueError:
+            messagebox.showerror("Validation Error", "Minimum quantity must be a valid whole number!", parent=self)
+            return
+
         # Update in database
         update_item(
             item_id,
