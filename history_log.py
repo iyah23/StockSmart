@@ -174,10 +174,10 @@ class HistoryLogsFrame(ctk.CTkFrame):
         refresh_btn.pack(padx=(0, 0), pady=(15, 0))
 
     def build_content(self):
-        content_container = ctk.CTkFrame(self, corner_radius=16, fg_color=COLOR_CARD_BG, border_width=1, border_color=COLOR_GRAY_200)
-        content_container.pack(fill="both", expand=True, padx=30, pady=20)
-        self.build_toolbar(content_container)
-        self.build_history_feed(content_container)
+        self.content_container = ctk.CTkFrame(self, corner_radius=16, fg_color=COLOR_CARD_BG, border_width=1, border_color=COLOR_GRAY_200)
+        self.content_container.pack(fill="both", expand=True, padx=30, pady=20)
+        self.build_toolbar(self.content_container)
+        self.build_history_feed(self.content_container)
 
     def build_toolbar(self, parent):
         toolbar_frame = ctk.CTkFrame(parent, fg_color="transparent", height=60)
@@ -189,13 +189,55 @@ class HistoryLogsFrame(ctk.CTkFrame):
         search_label.pack(side="left", padx=(0, 10), pady=15)
         self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search History...", font=FONT_BODY, text_color=COLOR_TEXT_PRIMARY, height=40, fg_color=COLOR_GRAY_50, border_color=COLOR_GRAY_300, corner_radius=8)
         self.search_entry.pack(side="left", expand=True, fill="x", pady=15)
-        # No search logic for now
+        
+        # Add clear search button
+        clear_btn = AnimatedButton(
+            search_frame,
+            text="✕",
+            font=("Segoe UI", 12, "bold"),
+            fg_color="transparent",
+            hover_color=COLOR_GRAY_200,
+            text_color=COLOR_TEXT_MUTED,
+            corner_radius=6,
+            width=30,
+            height=30,
+            command=self.clear_search
+        )
+        clear_btn.pack(side="right", padx=(10, 0), pady=15)
+        
+        # Bind search functionality
+        self.search_entry.bind("<KeyRelease>", self.on_search)
+        self.search_entry.bind("<Return>", self.on_search)
 
-    def build_history_feed(self, parent):
-        feed_frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
-        feed_frame.pack(fill="both", expand=True, padx=25, pady=(0, 20))
-        for date, activities in self.history_data.items():
-            self.create_date_section(feed_frame, date, activities)
+    def build_history_feed(self, parent, filtered_data=None):
+        # If feed_frame doesn't exist, create it
+        if not hasattr(self, 'feed_frame') or self.feed_frame is None:
+            self.feed_frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+            self.feed_frame.pack(fill="both", expand=True, padx=25, pady=(0, 20))
+        else:
+            # Clear existing content instead of destroying the frame
+            for widget in self.feed_frame.winfo_children():
+                widget.destroy()
+        
+        # Use filtered data if provided, otherwise use all history data
+        data_to_display = filtered_data if filtered_data is not None else self.history_data
+        
+        if not data_to_display:
+            # Show "No results found" message
+            no_results_label = ctk.CTkLabel(
+                self.feed_frame,
+                text="No matching history found.\nTry adjusting your search terms.",
+                font=FONT_BODY,
+                text_color=COLOR_TEXT_MUTED,
+                justify="center"
+            )
+            no_results_label.pack(pady=50)
+        else:
+            for date, activities in data_to_display.items():
+                self.create_date_section(self.feed_frame, date, activities)
+        
+        # Force update after adding content
+        self.feed_frame.update_idletasks()
 
     def create_date_section(self, parent, date, activities):
         date_header = ctk.CTkFrame(parent, fg_color="transparent", height=50)
@@ -231,12 +273,81 @@ class HistoryLogsFrame(ctk.CTkFrame):
         time_label.pack(side="right", anchor="ne")
 
     def refresh_data(self):
+        """Refresh history data and maintain current search state"""
+        # Store current search term
+        current_search = ""
+        if hasattr(self, 'search_entry'):
+            current_search = self.search_entry.get().strip()
+        
+        # Regenerate history data
         self.history_data = self.generate_history_data()
-        # Clear and rebuild content
-        for widget in self.winfo_children():
-            if isinstance(widget, ctk.CTkFrame) and widget not in [self]:
+        
+        # Instead of destroying everything, just refresh the feed content
+        if hasattr(self, 'feed_frame') and self.feed_frame is not None:
+            # Clear only the feed content
+            for widget in self.feed_frame.winfo_children():
                 widget.destroy()
-        self.setup_ui()
+            
+            # Rebuild the feed with current search state
+            if current_search:
+                filtered_data = self.filter_history_data(current_search)
+                self.build_history_feed(self.content_container, filtered_data)
+            else:
+                self.build_history_feed(self.content_container)
+        else:
+            # If feed_frame doesn't exist, rebuild everything
+            for widget in self.winfo_children():
+                if isinstance(widget, ctk.CTkFrame) and widget != self:
+                    widget.destroy()
+            
+            self.setup_ui()
+            
+            # Restore search term and apply filter if there was one
+            if current_search and hasattr(self, 'search_entry'):
+                self.search_entry.insert(0, current_search)
+                self.on_search()
+
+    def on_search(self, event=None):
+        """Handle search input and filter history data"""
+        search_term = self.search_entry.get().strip().lower()
+        
+        if not search_term:
+            # If search is empty, show all data
+            self.build_history_feed(self.content_container)
+        else:
+            # Filter data based on search term
+            filtered_data = self.filter_history_data(search_term)
+            self.build_history_feed(self.content_container, filtered_data)
+    
+    def filter_history_data(self, search_term):
+        """Filter history data based on search term"""
+        filtered_data = {}
+        
+        for date, activities in self.history_data.items():
+            matching_activities = []
+            
+            for activity in activities:
+                # Search in action, description, and other relevant fields
+                searchable_text = " ".join([
+                    activity.get("action", ""),
+                    activity.get("description", ""),
+                    activity.get("type", "")
+                ]).lower()
+                
+                if search_term in searchable_text:
+                    matching_activities.append(activity)
+            
+            # Only include dates that have matching activities
+            if matching_activities:
+                filtered_data[date] = matching_activities
+        
+        return filtered_data
+
+    def clear_search(self):
+        """Clear the search field and show all history data"""
+        if hasattr(self, 'search_entry'):
+            self.search_entry.delete(0, 'end')
+            self.build_history_feed(self.content_container)
 
 # Keep the window version for standalone use
 class HistoryLogsPage(ctk.CTk):

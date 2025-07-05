@@ -13,6 +13,7 @@ class MainApp(ctk.CTk):
         self.title("StockSmart")
         self.geometry("1200x800")
         self.resizable(True, True)
+        self.center_window()
         self.container = ctk.CTkFrame(self)
         self.container.pack(fill="both", expand=True)
         self.container.grid_rowconfigure(0, weight=1)
@@ -49,6 +50,26 @@ class MainApp(ctk.CTk):
             if hasattr(dashboard, "history_logs"):
                 dashboard.history_logs.refresh_data()
 
+    def center_window(self):
+        """Center the application window on the screen"""
+        # Update window to ensure we have the correct dimensions
+        self.update_idletasks()
+        
+        # Get window dimensions
+        window_width = 1200
+        window_height = 800
+        
+        # Get screen dimensions
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Calculate center position
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        # Set window position
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
 if __name__ == "__main__":
     app = MainApp()
-    app.mainloop() 
+    app.mainloop()

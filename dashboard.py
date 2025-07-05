@@ -759,6 +759,9 @@ class DashboardOverviewFrame(ctk.CTkFrame):
         period_label.pack(side="right")
         chart_content = ctk.CTkScrollableFrame(chart_frame, fg_color="transparent")
         chart_content.pack(fill="both", expand=True, padx=25, pady=(0, 20))
+        # Store reference for refreshing later
+        self.chart_content = chart_content
+        
         top_items = get_top_consumed_items()
         color_palette = [
             COLOR_PRIMARY,
@@ -771,9 +774,21 @@ class DashboardOverviewFrame(ctk.CTkFrame):
             COLOR_GRAY_700,
             COLOR_GRAY_800
         ]
-        for i, (item_name, percentage) in enumerate(top_items):
-            color = color_palette[i % len(color_palette)]
-            self.create_consumption_bar(chart_content, item_name, percentage, color, i)
+        
+        if top_items:
+            for i, (item_name, percentage) in enumerate(top_items):
+                color = color_palette[i % len(color_palette)]
+                self.create_consumption_bar(chart_content, item_name, percentage, color, i)
+        else:
+            # Show message when no consumption data is available
+            no_data_label = ctk.CTkLabel(
+                chart_content, 
+                text="No consumption data available yet.\nStart using inventory to see analytics here.",
+                font=FONT_BODY,
+                text_color=COLOR_TEXT_MUTED,
+                justify="center"
+            )
+            no_data_label.pack(pady=40)
 
     def create_consumption_bar(self, parent, item, value, color, index):
         bar_container = ctk.CTkFrame(parent, fg_color="transparent", height=50)
@@ -831,6 +846,45 @@ class DashboardOverviewFrame(ctk.CTkFrame):
             self.cards[1].animate_value(formatted_quantity)
             self.cards[2].animate_value(formatted_out)
             self.cards[3].animate_value(formatted_low)
+        
+        # Also refresh the analytics section (Top Consumed Products)
+        self.refresh_analytics_section()
+
+    def refresh_analytics_section(self):
+        """Refresh the analytics section (Top Consumed Products chart)"""
+        if hasattr(self, 'chart_content'):
+            # Clear existing chart content
+            for widget in self.chart_content.winfo_children():
+                widget.destroy()
+            
+            # Rebuild the chart with updated data
+            top_items = get_top_consumed_items()
+            color_palette = [
+                COLOR_PRIMARY,
+                COLOR_ACCENT_SUCCESS,
+                COLOR_ACCENT_ERROR,
+                COLOR_SECONDARY,
+                COLOR_ACCENT_WARNING,
+                COLOR_SECONDARY_DARK,
+                COLOR_GRAY_600,
+                COLOR_GRAY_700,
+                COLOR_GRAY_800
+            ]
+            
+            if top_items:
+                for i, (item_name, percentage) in enumerate(top_items):
+                    color = color_palette[i % len(color_palette)]
+                    self.create_consumption_bar(self.chart_content, item_name, percentage, color, i)
+            else:
+                # Show message when no consumption data is available
+                no_data_label = ctk.CTkLabel(
+                    self.chart_content, 
+                    text="No consumption data available yet.\nStart using inventory to see analytics here.",
+                    font=FONT_BODY,
+                    text_color=COLOR_TEXT_MUTED,
+                    justify="center"
+                )
+                no_data_label.pack(pady=40)
 
     def show_notifications(self):
         self.controller.show_notifications()

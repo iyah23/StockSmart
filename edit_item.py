@@ -22,6 +22,8 @@ class EditItemWindow(ctk.CTkToplevel):
         self.user_id = user_id
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
+        # Center the window
+        self.center_window()
         self.grid_columnconfigure(0, weight=2)
         self.grid_columnconfigure(1, weight=3)
         self.grid_rowconfigure(0, weight=1)
@@ -152,6 +154,26 @@ class EditItemWindow(ctk.CTkToplevel):
         self.grab_set()
         self.attributes('-topmost', True)
         self.after(10, lambda: self.attributes('-topmost', False))
+
+    def center_window(self):
+        """Center the edit item window on the screen"""
+        # Update window to ensure we have the correct dimensions
+        self.update_idletasks()
+        
+        # Get window dimensions
+        window_width = 800
+        window_height = 600
+        
+        # Get screen dimensions
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Calculate center position
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        # Set window position
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
     def save_item(self):
         item_id = self.item_id

@@ -24,10 +24,32 @@ class AddItemWindow(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
         self.focus_force()
+        # Center the window
+        self.center_window()
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         self.build_form()
+
+    def center_window(self):
+        """Center the add item window on the screen"""
+        # Update window to ensure we have the correct dimensions
+        self.update_idletasks()
+        
+        # Get window dimensions
+        window_width = 800
+        window_height = 600
+        
+        # Get screen dimensions
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Calculate center position
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        # Set window position
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
     def build_form(self):
         # Left frame
